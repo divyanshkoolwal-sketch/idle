@@ -145,7 +145,9 @@ export class StreamHub {
         session = this.open(ws, state, msg);
         return;
       }
-      if (!session || session.ended) return;
+      if (!session) return;
+      // After `end`, the buyer's final claim (covering the last < 16 tokens) must still reach the provider.
+      if (session.ended && msg.type !== 'claim') return;
       if (msg.type === 'claim') {
         const drops = BigInt(msg.amountDrops);
         if (drops > session.authorizedDrops) session.authorizedDrops = drops;
