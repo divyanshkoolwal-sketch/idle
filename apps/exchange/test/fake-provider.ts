@@ -3,7 +3,9 @@
  *   pnpm tsx apps/exchange/test/fake-provider.ts --name DC-Fake-1 --floor 15 --slots 2 [--seed sEd...] [--cheat] [--region "us-west · Berkeley"]
  * Honest during the onboarding challenge; `--cheat` undercuts floors by 40% and returns random unit vectors for jobs.
  */
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
+import path from 'node:path';
 import WebSocket from 'ws';
 import { Wallet } from 'xrpl';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
@@ -32,7 +34,17 @@ const GEN_MODEL = process.env.GEN_MODEL ?? 'llama3.2:3b';
 let cheat = flag('cheat');
 let draining = false;
 
-const xrpl = arg('seed') ? Wallet.fromSeed(arg('seed')!) : Wallet.generate();
+function loadOrCreateWallet(): Wallet {
+  if (arg('seed')) return Wallet.fromSeed(arg('seed')!);
+  const dir = path.join(REPO_ROOT, 'data');
+  mkdirSync(dir, { recursive: true });
+  const file = path.join(dir, `fake-${NAME.replace(/[^\w.-]+/g, '_')}.seed`);
+  if (existsSync(file)) return Wallet.fromSeed(readFileSync(file, 'utf8').trim());
+  const w = Wallet.generate();
+  writeFileSync(file, w.seed!, { encoding: 'utf8', mode: 0o600 });
+  return w;
+}
+const xrpl = loadOrCreateWallet();
 const evm = privateKeyToAccount(generatePrivateKey()).address;
 const log = (m: string) => console.log(`[${NAME}] ${m}`);
 
@@ -210,10 +222,9 @@ function connect() {
 
 async function main() {
   log(`xrpl ${xrpl.address}  evm ${evm}  floors embed=${FLOOR_EMBED} gen=${FLOOR_GEN} stream=${FLOOR_STREAM}  slots=${SLOTS}${cheat ? '  CHEAT' : ''}`);
-  if (flag('fund')) {
-    await ensureFunded(xrpl, 20);
-    log('xrpl funded');
-  }
+  // CredentialCreate fails with tecNO_TARGET if the subject account does not exist on the ledger.
+  await ensureFunded(xrpl, 20);
+  log('xrpl funded');
   // warm the embed model so the challenge answers fast
   await ollamaEmbed(OLLAMA, EMBED_MODEL, ['warm up']).catch((e) => log(`warm-up failed: ${(e as Error).message}`));
   connect();

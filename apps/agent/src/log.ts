@@ -14,7 +14,8 @@ export class AgentLogger {
     const ts = Date.now();
     if (!this.quiet) {
       const tag = { thought: '💭', action: '▶', spend: '$', result: '✔', error: '✘' }[kind];
-      console.log(`[${this.persona}] ${tag} ${text}`);
+      // stderr so streamed answer tokens on stdout stay clean
+      console.error(`[${this.persona}] ${tag} ${text}`);
     }
     const p = fetch(`${this.exchangeUrl}/v1/agents/${encodeURIComponent(this.agentId)}/log`, {
       method: 'POST',

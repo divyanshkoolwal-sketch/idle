@@ -114,7 +114,8 @@ export class MarketClient {
   }): Promise<Purchase> {
     let maxUnitPrice = args.maxUnitPrice ?? args.price.open;
     const ceiling = args.ceiling ?? args.price.ceiling;
-    const deadlineMs = args.deadlineMs ?? this.persona.deadlineMs;
+    // generation deadlines scale with length (assume a slow laptop does ~8 tok/s); embeds use the persona deadline
+    let deadlineMs = args.deadlineMs ?? (args.jobType === 'generate' ? Math.max(this.persona.deadlineMs, Math.ceil(args.units / 8) * 1000 + 3000) : this.persona.deadlineMs);
     const unit = args.jobType === 'embed' ? 'text' : 'token';
     for (let attempt = 1; attempt <= this.persona.maxRetries; attempt++) {
       const body: CreateJobRequest = {
@@ -166,6 +167,11 @@ export class MarketClient {
       if (first.status === 409) {
         const suggested = json.suggestedMaxUnitPrice ? BigInt(String(json.suggestedMaxUnitPrice)) : maxUnitPrice * 2n;
         const best = json.bestBid as BidView | undefined;
+        if (best?.reason === 'eta_exceeds_deadline' && deadlineMs < 180_000) {
+          deadlineMs = Math.min(Math.max(deadlineMs * 2, Math.ceil((best.etaMs ?? deadlineMs) * 1.3)), 180_000);
+          this.log.thought(`no provider can finish in ${unit === 'token' ? 'time' : 'time'}; extending the deadline to ${deadlineMs} ms`);
+          continue;
+        }
         if (this.persona.patient && attempt < this.persona.maxRetries) {
           this.log.thought(`outbid at ${maxUnitPrice} (best ask ${best?.unitPrice ?? '?'}); waiting ${this.persona.waitMs} ms for cheaper supply`);
           await sleep(this.persona.waitMs);

@@ -23,8 +23,20 @@ const SAMPLE = [
   'Prices rise when the market is busy and fall when it is idle.',
 ];
 
-export async function runScripted(deps: AgentDeps, task: { question?: string; indexUrl?: string; jobs?: number; stopAfterTokens?: number }): Promise<AgentOutcome> {
+export async function runScripted(deps: AgentDeps, task: { question?: string; indexUrl?: string; jobs?: number; stopAfterTokens?: number; streamPrompt?: string; streamMaxTokens?: number }): Promise<AgentOutcome> {
   const { market, log, persona } = deps;
+  if (task.streamPrompt) {
+    // P3 acceptance path: stream a generation over an XRPL payment channel, stop early, pay per delivered token.
+    log.thought(`streaming a ${task.streamMaxTokens ?? 300}-token generation over an XRPL payment channel`);
+    const out = await streamGeneration({ exchangeUrl: deps.exchangeUrl, wallet: deps.wallet, issuer: deps.issuer, persona, log, budget: deps.xrp }, task.streamPrompt, {
+      maxTokens: task.streamMaxTokens ?? 300,
+      stopAfterTokens: task.stopAfterTokens ?? 150,
+      model: deps.genModel,
+      onToken: (t) => process.stdout.write(t),
+    });
+    process.stdout.write('\n');
+    return { answer: out.text, sources: [], iterations: 1, stream: out };
+  }
   if (task.jobs) {
     log.thought(`buying ${task.jobs} embedding jobs on the x402 rail`);
     for (let i = 0; i < task.jobs; i++) {

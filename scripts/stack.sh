@@ -21,11 +21,12 @@ case "${1:-}" in
     start exchange pnpm -s dev:exchange ;;
   fake)
     n=${2:-2}; names=(DC-Oakland-2 DC-SF-3 DC-Davis-4); floors=(11 13 18); regions=("us-west · Oakland" "us-west · San Francisco" "us-west · Davis")
-    for i in $(seq 0 $((n-1))); do start "fake-${names[$i]}" pnpm -s tsx apps/exchange/test/fake-provider.ts --name "${names[$i]}" --floor "${floors[$i]}" --slots 2 --region "${regions[$i]}"; done ;;
+    for i in $(seq 0 $((n-1))); do start "fake-${names[$i]}" pnpm -s tsx apps/exchange/test/fake-provider.ts --name "${names[$i]}" --floor "${floors[$i]}" --slots 2 --region "${regions[$i]}" --fund; done ;;
   provider) start provider pnpm -s provider ;;
   down)
     for f in "$PIDS"/*.pid; do [ -f "$f" ] || continue; p=$(cat "$f"); n=$(basename "$f" .pid)
       if kill -0 "$p" 2>/dev/null; then pkill -TERM -P "$p" 2>/dev/null || true; kill -TERM "$p" 2>/dev/null || true; echo "stopped $n"; fi; rm -f "$f"; done ;;
   logs) tail -n 40 "$LOGS/${2:-exchange}.log" ;;
-  *) echo "usage: $0 up|fake N|provider|down|logs [name]"; exit 1 ;;
+  reset) "$0" down; rm -f "$ROOT/data/idle.db" "$ROOT/data/idle.db-wal" "$ROOT/data/idle.db-shm" "$ROOT/data/golden-"*.json; rm -f "$ROOT/data/events-"*.jsonl; echo "data reset (db, golden cache, recordings)" ;;
+  *) echo "usage: $0 up|fake N|provider|down|reset|logs [name]"; exit 1 ;;
 esac

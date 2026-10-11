@@ -53,6 +53,8 @@ export async function streamGeneration(
   const { log, persona } = ctx;
   let maxDrops = opts.maxDropsPerToken ?? persona.stream.open;
   const ceiling = opts.ceiling ?? persona.stream.ceiling;
+  // generation deadlines scale with length: assume a slow laptop does ~8 tok/s
+  let deadlineMs = opts.deadlineMs ?? Math.max(persona.deadlineMs, Math.ceil(opts.maxTokens / 8) * 1000 + 3000);
   let quote: StreamQuote | undefined;
   for (let attempt = 1; attempt <= persona.maxRetries && !quote; attempt++) {
     const body: CreateStreamRequest = {
@@ -60,7 +62,7 @@ export async function streamGeneration(
       model: opts.model,
       maxTokens: opts.maxTokens,
       maxDropsPerToken: maxDrops.toString(),
-      deadlineMs: opts.deadlineMs ?? persona.deadlineMs,
+      deadlineMs,
       persona: persona.name,
       agentId: log.agentId,
     };
@@ -72,6 +74,12 @@ export async function streamGeneration(
       break;
     }
     if (r.status === 409) {
+      const best = json.bestBid as { reason?: string; etaMs?: number } | undefined;
+      if (best?.reason === 'eta_exceeds_deadline' && deadlineMs < 180_000) {
+        deadlineMs = Math.min(Math.max(deadlineMs * 2, Math.ceil((best.etaMs ?? deadlineMs) * 1.3)), 180_000);
+        log.thought(`no provider can finish in time; extending the deadline to ${deadlineMs} ms`);
+        continue;
+      }
       const suggested = json.suggestedMaxUnitPrice ? BigInt(String(json.suggestedMaxUnitPrice)) : maxDrops * 2n;
       const next = suggested < ceiling ? suggested : ceiling;
       if (next <= maxDrops) throw new MarketError('no acceptable stream bid under ceiling', 'NO_ACCEPTABLE_BID', json);
