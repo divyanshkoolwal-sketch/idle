@@ -10,10 +10,8 @@ export const CREDENTIAL_TYPES = {
   A: 'IDLE_DC_TIER_A',
   B: 'IDLE_DC_TIER_B',
 } as const;
-export type Tier = keyof typeof CREDENTIAL_TYPES;
 
 export const JOB_TYPES = ['embed', 'generate', 'stream'] as const;
-export type JobType = (typeof JOB_TYPES)[number];
 
 export const basescanTx = (hash: string) => `${BASE_SEPOLIA_EXPLORER}/tx/${hash}`;
 export const basescanAddress = (addr: string) => `${BASE_SEPOLIA_EXPLORER}/address/${addr}`;
