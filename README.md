@@ -7,6 +7,8 @@ For the demo, our laptops are the data centers. Each one runs real inference wit
 
 Built at B@BHacks 2.0 (October 11, 2026).
 
+**Live dashboard (recorded run, permanent link):** https://idle-replay.vercel.app — the same UI the exchange serves, replaying a recorded market session. During judging the live tunnel URL is shared separately.
+
 ## Why
 
 Agents need compute per job, right now, without accounts or credit cards. Data centers have spare minutes they can't sell because GPUs are rented by the hour or by the month. Idle connects the two:
