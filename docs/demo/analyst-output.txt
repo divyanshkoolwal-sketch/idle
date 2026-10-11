@@ -1,0 +1,29 @@
+Based on the provided sources, the fastest open models on Apple Silicon for running local LLMs are:
+
+* Llama 3 8b Q4 with Jan.ai for a local LLM setup, which was benchmarked on the iMac M3, Mac Mini M2 Pro, and MacBook Air M2, with the iMac M3 showing the fastest performance.
+* Dense 14B MoE LLM, which was able to generate the first token in under 10 seconds on a MacBook Pro with the M5 chip and MLX.
+
+Sources:
+[1], [3]
+
+────────────────────────────────────────────────────────────────────────
+Based on the provided sources, the fastest open models on Apple Silicon for running local LLMs are:
+
+* Llama 3 8b Q4 with Jan.ai for a local LLM setup, which was benchmarked on the iMac M3, Mac Mini M2 Pro, and MacBook Air M2, with the iMac M3 showing the fastest performance.
+* Dense 14B MoE LLM, which was able to generate the first token in under 10 seconds on a MacBook Pro with the M5 chip and MLX.
+
+Sources:
+[1], [3]
+
+Sources:
+  [1] https://llmcheck.net/benchmarks
+  [2] https://machinelearning.apple.com/research/exploring-llms-mlx-m5
+  [3] https://www.sitepoint.com/local-llms-apple-silicon-mac-2026/
+  [4] https://www.youtube.com/watch?v=DMRK9rF2ee8
+
+Spend report
+  jobs bought      2
+  AUSD settled     0 of 5
+  XRP authorized   0.00476 of 20  (claim https://testnet.xrpl.org/transactions/35526B86EC826A0E3BBB260D018BA836745090A3F2A5C15E5ED292CAFC07C2F1)
+  stream           119 tokens × 40 drops = 4760 drops authorized; provider DC-Berkeley-1; channel 6E4E854E2E26EDDA…
+  elapsed          39.3 s

@@ -1,0 +1,22 @@
+💭 market: 3 verified data centers, 6 free slots; budget 5 AUSD / 20 XRP
+💭 searching: What are the fastest open models on Apple Silicon right now?
+✔ 8 results; scraping the top 4
+💭 64 chunks from 4 pages; buying embeddings
+▶ bidding 64 texts of embed at ≤ 24 µAUSD/text, deadline 3000 ms
+✔ embed done by DC-Oakland-2 in 4832 ms (payments off)
+▶ bidding 1 texts of embed at ≤ 24 µAUSD/text, deadline 3000 ms
+✔ embed done by DC-Oakland-2 in 128 ms (payments off)
+▶ stream quote: 300 tokens at ≤ 55 drops/token
+💭 DC-Berkeley-1 won the stream at 40 drops/token
+💭 reusing channel 6E4E854E2E26… (9.993066 XRP unclaimed)
+✔ stream started with DC-Berkeley-1
+$ signed claim 7574 drops (16 tokens × 40) (every 16 tokens)
+$ signed claim 8214 drops (32 tokens × 40) (every 16 tokens)
+$ signed claim 8854 drops (48 tokens × 40) (every 16 tokens)
+$ signed claim 9494 drops (64 tokens × 40) (every 16 tokens)
+$ signed claim 10134 drops (80 tokens × 40) (every 16 tokens)
+$ signed claim 10774 drops (96 tokens × 40) (every 16 tokens)
+$ signed claim 11414 drops (112 tokens × 40) (every 16 tokens)
+$ signed claim 11694 drops (119 tokens × 40) final
+✔ stream ended (done) after 119 tokens
+✔ provider claimed 11694 drops for 119 tokens on-ledger  https://testnet.xrpl.org/transactions/35526B86EC826A0E3BBB260D018BA836745090A3F2A5C15E5ED292CAFC07C2F1
