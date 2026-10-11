@@ -7,7 +7,7 @@ import express from 'express';
 import type { Server } from 'node:http';
 import { privateKeyToAccount } from 'viem/accounts';
 import { loadEnv, REPO_ROOT, basescanTx, formatUnits } from '@idle/shared';
-import { createResourceServer, ausdPaymentOption, x402HTTPResourceServer, requestContext, createPaidFetch, ausdBalance, ethBalance } from '@idle/pay-evm';
+import { createAusdGate, createPaidFetch, ausdBalance, ethBalance } from '@idle/pay-evm';
 import { createFacilitator } from '../apps/facilitator/src/app';
 import { PROVIDER_ENV, readEnvValue, banner, ok, info, fail, assert } from './_lib';
 
@@ -38,31 +38,18 @@ async function main() {
   const f = await listen(fac.app);
   info(`facilitator on :${f.port} (relayer ${fac.address})`);
 
-  // resource server with a dynamic-capable route, static here
-  const resource = createResourceServer(`http://localhost:${f.port}`);
-  const routes = { 'GET /paid': { accepts: ausdPaymentOption({ payTo: provider, amount: PRICE }), description: 'smoke test resource' } };
-  const httpServer = new x402HTTPResourceServer(resource, routes);
-  await httpServer.initialize();
+  // the same dynamic gate the exchange uses: price/payTo per request, settle only after the work passes
+  const gate = createAusdGate({ routePattern: 'GET /paid', facilitatorUrl: `http://localhost:${f.port}` });
+  await gate.initialize();
   const app = express();
   app.use(express.json());
   app.get('/paid', async (req, res) => {
-    const ctx = requestContext(req);
-    const r = await httpServer.processHTTPRequest(ctx);
-    if (r.type === 'payment-error') {
-      res.status(r.response.status);
-      for (const [k, v] of Object.entries(r.response.headers)) res.setHeader(k, v);
-      return res.json({ ...(r.response.body as object), quoteId: 'smoke-quote' });
-    }
-    if (r.type === 'no-payment-required') return res.json({ free: true });
-    // verified: do the "work", then settle (settle-after-verify)
-    const settle = await httpServer.processSettlement(r.paymentPayload, r.paymentRequirements, r.declaredExtensions, { request: ctx });
-    if (!settle.success) {
-      res.status(settle.response.status);
-      for (const [k, v] of Object.entries(settle.response.headers)) res.setHeader(k, v);
-      return res.json(settle.response.body ?? { error: settle.errorReason });
-    }
-    for (const [k, v] of Object.entries(settle.headers)) res.setHeader(k, v);
-    res.json({ result: 'paid work', receipt: { txHash: settle.transaction, explorerUrl: basescanTx(settle.transaction), payer: settle.payer } });
+    const g = await gate.check(req, res, { payTo: provider, amount: PRICE, body402: { error: 'PAYMENT_REQUIRED', quote: { quoteId: 'smoke-quote', payTo: provider, amount: PRICE.toString() } } });
+    if (g.kind === 'responded') return;
+    // "work" + verification happen here; then settle
+    const settled = await g.settle();
+    if (!settled.success) return res.status(502).json({ error: settled.reason, message: settled.message });
+    res.json({ result: 'paid work', receipt: { txHash: settled.txHash, explorerUrl: settled.explorerUrl, payer: settled.payer } });
   });
   const s = await listen(app);
   const url = `http://localhost:${s.port}/paid`;
@@ -71,7 +58,9 @@ async function main() {
   const unpaid = await fetch(url);
   assert(unpaid.status === 402, `expected 402, got ${unpaid.status}`);
   assert(unpaid.headers.get('PAYMENT-REQUIRED'), 'missing PAYMENT-REQUIRED header');
-  ok('unpaid request → 402 with PAYMENT-REQUIRED header');
+  const unpaidBody = (await unpaid.json()) as { quote?: { quoteId: string } };
+  assert(unpaidBody.quote?.quoteId === 'smoke-quote', '402 body should carry the quote');
+  ok('unpaid request → 402 with PAYMENT-REQUIRED header + quote in the JSON body');
 
   // paid call
   const before = await ausdBalance(provider);

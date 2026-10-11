@@ -65,11 +65,11 @@ export const ProviderMessage = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('result'),
     jobId: z.string(),
-    ok: z.literal(true),
-    output: z.object({ embeddings: z.array(z.array(z.number())).optional(), text: z.string().optional(), tokens: z.number().optional() }),
-    ms: z.number(),
+    ok: z.boolean(),
+    output: z.object({ embeddings: z.array(z.array(z.number())).optional(), text: z.string().optional(), tokens: z.number().optional() }).optional(),
+    ms: z.number().optional(),
+    error: z.string().optional(),
   }),
-  z.object({ type: z.literal('result'), jobId: z.string(), ok: z.literal(false), error: z.string() }),
   z.object({ type: z.literal('stream.token'), streamId: z.string(), token: z.string(), index: z.number() }),
   z.object({ type: z.literal('stream.paused'), streamId: z.string(), unpaidTokens: z.number() }),
   z.object({ type: z.literal('stream.end'), streamId: z.string(), tokensDelivered: z.number(), reason: z.enum(['done', 'stopped', 'error', 'unpaid']), error: z.string().optional() }),
@@ -378,9 +378,13 @@ export const JobResult = z.object({
 });
 export type JobResult = z.infer<typeof JobResult>;
 
+export type PaymentRequiredBody = z.infer<typeof PaymentRequiredBody>;
 export const NoCapacity = z.object({ error: z.literal('NO_CAPACITY'), retryAfterMs: z.number() });
 export const NoAcceptableBid = z.object({ error: z.literal('NO_ACCEPTABLE_BID'), bestBid: BidView.optional(), suggestedMaxUnitPrice: Atomic.optional(), auctionId: z.string() });
 export const ProviderFailed = z.object({ error: z.literal('PROVIDER_FAILED_VERIFICATION'), charged: z.literal(false), jobId: z.string(), providerId: z.string(), cosine: z.number().optional() });
+export type NoCapacity = z.infer<typeof NoCapacity>;
+export type NoAcceptableBid = z.infer<typeof NoAcceptableBid>;
+export type ProviderFailed = z.infer<typeof ProviderFailed>;
 
 /** POST /v1/streams */
 export const CreateStreamRequest = z.object({
@@ -392,6 +396,7 @@ export const CreateStreamRequest = z.object({
   persona: z.string().optional(),
   agentId: z.string().optional(),
 });
+export type CreateStreamRequest = z.infer<typeof CreateStreamRequest>;
 export const StreamQuote = z.object({
   quoteId: z.string(),
   streamId: z.string(),

@@ -41,7 +41,7 @@ export function ausdPaymentOption(args: { payTo: Dyn<string>; amount: Dyn<bigint
 
 /** Mirrors @x402/express's adapter so the stock @x402/fetch client works unmodified. */
 export class ExpressAdapter implements HTTPAdapter {
-  constructor(private req: Request) {}
+  constructor(readonly req: Request) {}
   getHeader(name: string): string | undefined {
     const v = this.req.header(name);
     return Array.isArray(v) ? v[0] : v;
