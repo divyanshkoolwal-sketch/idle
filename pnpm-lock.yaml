@@ -324,6 +324,9 @@ importers:
       '@idle/shared':
         specifier: workspace:*
         version: link:../shared
+      ripple-keypairs:
+        specifier: ^3.1.0
+        version: 3.1.0
       xrpl:
         specifier: ^5.3.0
         version: 5.3.0
