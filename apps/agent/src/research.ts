@@ -9,10 +9,18 @@ export interface Chunk {
 
 /** Split markdown into ~800-character pieces on paragraph boundaries. */
 export function chunkMarkdown(url: string, title: string, markdown: string, target = 800, startId = 0): Chunk[] {
+  const hardMax = Math.floor(target * 1.6);
   const paras = markdown
     .split(/\n{2,}/)
     .map((p) => p.replace(/\s+/g, ' ').trim())
-    .filter((p) => p.length > 40 && !/^[|#\-=*_]+$/.test(p));
+    .filter((p) => p.length > 40 && !/^[|#\-=*_]+$/.test(p))
+    // a paragraph with no blank lines (long lists, tables) is hard-split so no chunk can exceed hardMax
+    .flatMap((p) => {
+      if (p.length <= hardMax) return [p];
+      const parts: string[] = [];
+      for (let i = 0; i < p.length; i += target) parts.push(p.slice(i, i + target));
+      return parts;
+    });
   const chunks: Chunk[] = [];
   let buf = '';
   let id = startId;
@@ -23,9 +31,9 @@ export function chunkMarkdown(url: string, title: string, markdown: string, targ
     } else {
       buf = buf ? buf + ' ' + p : p;
     }
-    if (buf.length > target * 1.6) {
-      chunks.push({ id: id++, url, title, text: buf.slice(0, target * 1.6).trim() });
-      buf = buf.slice(target * 1.6);
+    while (buf.length > hardMax) {
+      chunks.push({ id: id++, url, title, text: buf.slice(0, hardMax).trim() });
+      buf = buf.slice(hardMax);
     }
   }
   if (buf.trim()) chunks.push({ id: id++, url, title, text: buf.trim() });

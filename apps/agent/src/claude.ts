@@ -58,7 +58,7 @@ const TOOLS: Anthropic.Tool[] = [
   {
     name: 'web_search',
     description: 'Context.dev web search. Returns numbered results with title, url, description and relevance.',
-    input_schema: { type: 'object', properties: { query: { type: 'string' }, numResults: { type: 'integer', minimum: 3, maximum: 10 } }, required: ['query', 'numResults'], additionalProperties: false },
+    input_schema: { type: 'object', properties: { query: { type: 'string' }, numResults: { type: 'integer', description: '3–10' } }, required: ['query', 'numResults'], additionalProperties: false },
     strict: true,
   },
   {
@@ -73,7 +73,7 @@ const TOOLS: Anthropic.Tool[] = [
       'Buy embeddings on the x402/AUSD rail for every workspace chunk not yet embedded, plus the query. maxUnitPrice is your bid in micro-AUSD per text (1 AUSD = 1,000,000). The exchange runs a sealed-bid second-price auction; if nobody accepts your price you get an error with a suggested price and may bid again. Ranks the chunks by similarity to the query and returns the top ones.',
     input_schema: {
       type: 'object',
-      properties: { query: { type: 'string' }, maxUnitPrice: { type: 'integer', minimum: 1 }, deadlineMs: { type: 'integer', minimum: 500, maximum: 120000 } },
+      properties: { query: { type: 'string' }, maxUnitPrice: { type: 'integer', description: 'micro-AUSD per text, ≥ 1' }, deadlineMs: { type: 'integer', description: '500–120000' } },
       required: ['query', 'maxUnitPrice', 'deadlineMs'],
       additionalProperties: false,
     },
@@ -82,14 +82,14 @@ const TOOLS: Anthropic.Tool[] = [
   {
     name: 'buy_generation',
     description:
-      'Generate the cited final answer from the ranked chunks. rail "x402" pays AUSD up front for maxTokens (fixed price per token, maxUnitPrice in micro-AUSD/token). rail "stream" pays XRP per delivered token over an XRPL payment channel (maxUnitPrice in drops/token) and can stop early: set stopAfterTokens to cut the stream once enough has arrived, or null to let it finish. Returns the text and what was paid.',
+      'Generate the cited final answer from the ranked chunks. rail "x402" pays AUSD up front for maxTokens (fixed price per token, maxUnitPrice in micro-AUSD/token). rail "stream" pays XRP per delivered token over an XRPL payment channel (maxUnitPrice in drops/token) and can stop early: set stopAfterTokens to cut the stream once enough has arrived, or 0 to let it finish. Returns the text and what was paid.',
     input_schema: {
       type: 'object',
       properties: {
         rail: { type: 'string', enum: ['x402', 'stream'] },
-        maxTokens: { type: 'integer', minimum: 32, maximum: 512 },
-        maxUnitPrice: { type: 'integer', minimum: 1 },
-        stopAfterTokens: { type: ['integer', 'null'], minimum: 16 },
+        maxTokens: { type: 'integer', description: '32–512' },
+        maxUnitPrice: { type: 'integer', description: '≥ 1: micro-AUSD per token (x402) or drops per token (stream)' },
+        stopAfterTokens: { type: 'integer', description: '0 = let the stream finish; otherwise stop after this many tokens (≥ 16)' },
       },
       required: ['rail', 'maxTokens', 'maxUnitPrice', 'stopAfterTokens'],
       additionalProperties: false,
@@ -148,7 +148,7 @@ export async function runClaudeAgent(deps: AgentDeps, task: AgentTask): Promise<
         });
       }
       case 'web_search': {
-        const hits = await webSearch(String(input.query), Number(input.numResults ?? 8));
+        const hits = await webSearch(String(input.query), clamp(Number(input.numResults ?? 8), 3, 10));
         return JSON.stringify(hits.map((h, i) => ({ i: i + 1, ...h, description: h.description.slice(0, 160) })));
       }
       case 'scrape': {
@@ -164,8 +164,8 @@ export async function runClaudeAgent(deps: AgentDeps, task: AgentTask): Promise<
       }
       case 'buy_embeddings': {
         const query = String(input.query);
-        const maxUnitPrice = BigInt(Math.floor(Number(input.maxUnitPrice)));
-        const deadlineMs = Number(input.deadlineMs);
+        const maxUnitPrice = BigInt(Math.max(1, Math.floor(Number(input.maxUnitPrice))));
+        const deadlineMs = clamp(Number(input.deadlineMs), 500, 120_000);
         const pending = [...ws.pages.values()].flatMap((p) => p.chunks).filter((c) => !ws.vectors.has(c.id));
         if (pending.length === 0 && ws.queryVec) return JSON.stringify({ note: 'nothing new to embed', ranked: ws.ranked.slice(0, 8).map((r) => ({ id: r.id, score: +r.score.toFixed(3), url: r.url, text: r.text.slice(0, 200) })) });
         const batches: Chunk[][] = [];
@@ -194,9 +194,10 @@ export async function runClaudeAgent(deps: AgentDeps, task: AgentTask): Promise<
       }
       case 'buy_generation': {
         const rail = String(input.rail) as 'x402' | 'stream';
-        const maxTokens = Number(input.maxTokens);
-        const maxUnitPrice = BigInt(Math.floor(Number(input.maxUnitPrice)));
-        const stopAfter = input.stopAfterTokens == null ? undefined : Number(input.stopAfterTokens);
+        const maxTokens = clamp(Number(input.maxTokens), 32, 512);
+        const maxUnitPrice = BigInt(Math.max(1, Math.floor(Number(input.maxUnitPrice))));
+        const stopAfterRaw = Number(input.stopAfterTokens ?? 0);
+        const stopAfter = stopAfterRaw > 0 ? Math.max(16, stopAfterRaw) : undefined;
         const question = task.question ?? task.indexUrl ?? '';
         const prompt = ws.ranked.length ? buildAnswerPrompt(question, ws.ranked) : `Answer concisely: ${question}`;
         if (rail === 'stream') {
@@ -225,14 +226,26 @@ export async function runClaudeAgent(deps: AgentDeps, task: AgentTask): Promise<
 
   while (iterations < 24 && finished === undefined) {
     iterations++;
-    const response = await client.messages.create({
-      model: deps.model,
-      max_tokens: 8000,
-      system,
-      tools: TOOLS,
-      messages,
-      output_config: { effort: deps.effort },
-    });
+    let response: Anthropic.Message;
+    try {
+      response = await client.messages.create({
+        model: deps.model,
+        max_tokens: 8000,
+        system,
+        tools: TOOLS,
+        messages,
+        output_config: { effort: deps.effort },
+      });
+    } catch (e) {
+      // The purchases already happened and are paid for: never lose the answer because the planner's API failed.
+      const msg = e instanceof Anthropic.APIError ? `${e.status} ${e.message}` : e instanceof Error ? e.message : String(e);
+      log.error(`model call failed: ${msg.slice(0, 160)}`);
+      if (ws.answer) {
+        log.thought('returning the answer that was already bought');
+        break;
+      }
+      throw e;
+    }
     for (const block of response.content) {
       if (block.type === 'text' && block.text.trim()) log.thought(block.text.trim().split('\n')[0].slice(0, 200));
     }
@@ -274,6 +287,8 @@ export async function runClaudeAgent(deps: AgentDeps, task: AgentTask): Promise<
   const answer = finished ?? ws.answer;
   return { answer, sources: [...sources], iterations, stream: ws.lastStream };
 }
+
+const clamp = (n: number, lo: number, hi: number) => (Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : lo);
 
 function summarizeInput(input: Record<string, unknown>): string {
   return Object.entries(input)

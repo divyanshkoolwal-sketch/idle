@@ -42,7 +42,7 @@ async function main() {
   const out = scripted ? await runScripted(deps, { question, indexUrl, jobs, stopAfterTokens, streamPrompt, streamMaxTokens }) : await runClaudeAgent(deps, { question, indexUrl, stopAfterTokens });
 
   console.log('\n' + '─'.repeat(72));
-  if (out.answer) console.log(out.answer.trim());
+  if (out.answer) console.log(out.answer.trim().replace(/\n+Sources:\s*(\[\d+\]\s*)*$/i, '').trim()); // the model's own (often empty) source list is replaced by ours below
   if (out.sources.length) console.log('\nSources:\n' + out.sources.map((s, i) => `  [${i + 1}] ${s}`).join('\n'));
   const b = market.budget();
   console.log('\nSpend report');

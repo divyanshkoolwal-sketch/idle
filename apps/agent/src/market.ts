@@ -95,7 +95,8 @@ export class MarketClient {
 
   async buyEmbeddings(texts: string[], opts: BuyOptions = {}): Promise<Purchase> {
     if (texts.length > 64) throw new MarketError('max 64 texts per job', 'TOO_MANY');
-    return this.buy({ jobType: 'embed', input: { texts }, units: texts.length, price: this.persona.embed, ...opts });
+    const safe = texts.map((t) => (t.length > 8000 ? t.slice(0, 8000) : t)); // exchange limit per text
+    return this.buy({ jobType: 'embed', input: { texts: safe }, units: safe.length, price: this.persona.embed, ...opts });
   }
 
   async buyGeneration(prompt: string, maxTokens: number, opts: BuyOptions = {}): Promise<Purchase> {
