@@ -23,5 +23,10 @@
   },
   "devDependencies": {
     "@types/ws": "^8.18.2"
+  },
+  "main": "./src/lib.ts",
+  "types": "./src/lib.ts",
+  "exports": {
+    ".": "./src/lib.ts"
   }
 }
