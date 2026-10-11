@@ -49,6 +49,7 @@ Agents need compute per job, right now, without accounts or credit cards. Data c
 | `apps/provider` | Data-center daemon, one per laptop: benchmark, bidding agent, Ollama runner, XRPL stream payee |
 | `apps/agent` | Buyer agents (Claude tool-use loop + Context.dev research) with x402 and XRPL payment clients |
 | `apps/dashboard` | Vite + React big-screen live market, with replay mode |
+| `apps/mcp` | MCP server (`idle_market`, `idle_embed`, `idle_generate`, `idle_budget`) so any MCP agent can buy compute with one tool call |
 | `packages/shared` | zod wire protocol, bigint money math, constants |
 | `packages/pay-evm` | AUSD helpers, EIP-712 domain loader, x402 client with spending policy, dynamic-price x402 gate |
 | `packages/pay-xrpl` | XRPL client, per-account tx queue, Credentials, Payment Channels |
@@ -82,6 +83,13 @@ Smoke-test transactions on XRPL testnet (issuer `rM6wXjEPCMByRWfrb61WEcWmzkCTwLk
 | CredentialDelete | https://testnet.xrpl.org/transactions/61F77A061179C709F29EA68DF79BF53230F721F527523A3906194653B3D10EE2 |
 | PaymentChannelCreate (5 XRP) | https://testnet.xrpl.org/transactions/BCBA8F5722B568FA5FF0B1A2DC32EABB8273206DFB45778A5F04898A0E15FED2 |
 | PaymentChannelClaim (250,000 drops, exact) | https://testnet.xrpl.org/transactions/16B9E2BD30533BB06EAE23F53D896E28EFEBB617717FAE85F43754AC052B02DA |
+
+Live-market transactions (real provider daemon + buyer agent, same testnet):
+
+| Step | Transaction |
+|---|---|
+| Streamed generation: 150 tokens × 40 drops, claimed on-ledger after an early stop (cumulative 6,640 drops incl. 640 from a prior stream on the same channel) | https://testnet.xrpl.org/transactions/FCB4C035591C4F5C60DC9E63ACAA30DE233E09208BDA9958838895FCD02DD7A4 |
+| A cheating data center (random vectors) caught by spot checks and revoked: CredentialDelete | https://testnet.xrpl.org/transactions/F640B912E1569147DAC3973FBE59C706CA6A3D4B7D7CEACC2C90C0BB21F927CD |
 
 ### Context.dev
 
@@ -120,13 +128,20 @@ The daemon generates its own wallets, funds its XRPL account from the testnet fa
 
 ### Three-laptop demo
 
-- **Laptop A (projector):** `pnpm dev:facilitator`, `pnpm dev:exchange`, `pnpm provider`, `cloudflared tunnel --url http://localhost:8080`.
-- **Laptop B:** `EXCHANGE_URL=<tunnel> pnpm provider` (cheaper floors).
-- **Laptop C:** `EXCHANGE_URL=<tunnel> pnpm provider` (the cheat toggle lives here) plus both agents.
+See [docs/RUNBOOK.md](docs/RUNBOOK.md) for the exact commands, the 90-second live sequence and the fallbacks. In short: Laptop A runs the facilitator, exchange, a provider and a `cloudflared` tunnel; laptops B and C run `EXCHANGE_URL=<tunnel> pnpm provider`; the agents run on A. `scripts/stack.sh` starts and stops everything with logs under `data/logs/`.
+
+### Use it from Claude Code (MCP)
+
+```bash
+claude mcp add idle -- $(pwd)/node_modules/.bin/tsx $(pwd)/apps/mcp/src/index.ts
+```
+
+Then any Claude Code session can call `idle_embed`, `idle_generate` (x402 or XRPL stream) and `idle_budget`; spending is capped by `AGENT_BUDGET_AUSD` / `AGENT_BUDGET_XRP`.
 
 ## What's real
 
-- Real inference (Ollama on each laptop), real auctions (every bid comes from a provider's live load), real verification (cosine against reference vectors), real payments on testnets. Only configuration is seeded: provider names, regions and price floors.
+- Real inference (Ollama on each laptop), real auctions (every bid comes from a provider's live load, surge × shade × jitter), real verification (cosine against reference vectors re-embedded on another provider or the exchange's own model), real payments on testnets. Only configuration is seeded: provider names, regions and price floors.
+- The exchange's auction engine has unit tests (ties, single bidder, no valid bid, deadline filter, second-price math); the provider's bidder has unit tests; both apps have end-to-end harnesses (`apps/exchange/test/fake-provider.ts`, `apps/provider/test/fake-exchange.ts`) that run against real Ollama and the real XRPL testnet.
 - Testnets only. Secrets live only in gitignored `.env` files.
 
 _Live-run explorer links (Basescan settlements, credential revocation) are added here after the demo run._
