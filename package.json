@@ -5,7 +5,9 @@
   "type": "module",
   "description": "Idle — a real-time spot market where AI agents bid for GPU time from data centers. AUSD over x402, XRP over XRPL payment channels, XRPL Credentials as the trust layer.",
   "packageManager": "pnpm@10.28.0",
-  "engines": { "node": ">=20.19" },
+  "engines": {
+    "node": ">=20.19"
+  },
   "scripts": {
     "dev:exchange": "pnpm --filter @idle/exchange dev",
     "dev:facilitator": "pnpm --filter @idle/facilitator dev",
@@ -35,17 +37,22 @@
     "@x402/fetch": "2.28.0",
     "context.dev": "^3.5.0",
     "dotenv": "^16.4.5",
+    "express": "^5.3.0",
     "viem": "^2.57.4",
     "xrpl": "^5.3.0",
-    "zod": "^3.25.0"
+    "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@types/express": "^5.0.6",
     "@types/node": "^22.10.0",
     "tsx": "^4.23.0",
     "typescript": "^5.7.0",
     "vitest": "^5.0.0"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["better-sqlite3", "esbuild"]
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "esbuild"
+    ]
   }
 }

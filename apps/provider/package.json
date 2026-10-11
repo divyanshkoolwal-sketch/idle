@@ -8,8 +8,15 @@
     "start": "tsx src/index.ts"
   },
   "dependencies": {
-    "@idle/shared": "workspace:*",
     "@idle/pay-evm": "workspace:*",
-    "@idle/pay-xrpl": "workspace:*"
+    "@idle/pay-xrpl": "workspace:*",
+    "@idle/shared": "workspace:*",
+    "viem": "^2.57.4",
+    "ws": "^8.22.0",
+    "xrpl": "^5.3.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.2"
   }
 }
