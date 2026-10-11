@@ -6,11 +6,13 @@ loadEnv(REPO_ROOT);
 const OLLAMA = process.env.OLLAMA_URL ?? 'http://localhost:11434';
 const EMBED = process.env.EMBED_MODEL ?? 'nomic-embed-text';
 const GEN = process.env.GEN_MODEL ?? 'llama3.2:3b';
+// CPU by default: on some Macs Ollama's Metal path is broken for these models (gibberish / non-discriminating embeddings).
+const OPTS = (process.env.OLLAMA_DEVICE ?? 'cpu') === 'cpu' ? { num_gpu: 0 } : {};
 
 banner(`smoke: Ollama @ ${OLLAMA}`);
 const texts = ['GPUs are sold out.', 'Agents need compute per job.', 'Data centers have spare minutes.', 'Idle is a spot market.'];
 const t0 = Date.now();
-const er = await fetch(`${OLLAMA}/api/embed`, { method: 'POST', body: JSON.stringify({ model: EMBED, input: texts }) });
+const er = await fetch(`${OLLAMA}/api/embed`, { method: 'POST', body: JSON.stringify({ model: EMBED, input: texts, options: OPTS }) });
 if (!er.ok) fail(`embed failed: ${er.status} ${await er.text()}`);
 const ej = (await er.json()) as { embeddings: number[][] };
 assert(Array.isArray(ej.embeddings) && ej.embeddings.length === 4, 'expected 4 embeddings');
@@ -20,7 +22,7 @@ ok(`embed ${EMBED}: 4 texts → dim ${ej.embeddings[0].length} in ${Date.now() -
 
 const gr = await fetch(`${OLLAMA}/api/generate`, {
   method: 'POST',
-  body: JSON.stringify({ model: GEN, prompt: 'Name three open-source language models and one fact about each.', stream: true, options: { num_predict: 32, temperature: 0.2, seed: 7 } }),
+  body: JSON.stringify({ model: GEN, prompt: 'Name three open-source language models and one fact about each.', stream: true, options: { num_predict: 32, temperature: 0.2, seed: 7, ...OPTS } }),
 });
 if (!gr.ok || !gr.body) fail(`generate failed: ${gr.status} ${await gr.text()}`);
 const reader = gr.body.getReader();

@@ -20,7 +20,7 @@ case "${1:-}" in
     if [ "${PAYMENTS:-on}" != "off" ]; then start facilitator pnpm -s dev:facilitator; fi
     start exchange pnpm -s dev:exchange ;;
   fake)
-    n=${2:-2}; names=(DC-Berkeley-1 DC-Oakland-2 DC-SF-3 DC-Davis-4); floors=(15 11 13 18); regions=("us-west · Berkeley" "us-west · Oakland" "us-west · San Francisco" "us-west · Davis")
+    n=${2:-2}; names=(DC-Oakland-2 DC-SF-3 DC-Davis-4); floors=(11 13 18); regions=("us-west · Oakland" "us-west · San Francisco" "us-west · Davis")
     for i in $(seq 0 $((n-1))); do start "fake-${names[$i]}" pnpm -s tsx apps/exchange/test/fake-provider.ts --name "${names[$i]}" --floor "${floors[$i]}" --slots 2 --region "${regions[$i]}"; done ;;
   provider) start provider pnpm -s provider ;;
   down)
