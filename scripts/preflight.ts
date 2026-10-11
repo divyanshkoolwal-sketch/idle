@@ -39,7 +39,7 @@ async function main() {
   const relayer = privateKeyToAccount(process.env.FACILITATOR_PRIVATE_KEY as `0x${string}`).address;
   const agent = privateKeyToAccount(process.env.AGENT_EVM_PRIVATE_KEY as `0x${string}`).address;
   const [rEth, aEth, aAusd] = await Promise.all([ethBalance(relayer), ethBalance(agent), ausdBalance(agent)]);
-  check(rEth >= 10n ** 14n, `relayer ETH ${formatUnits(rEth, 18, 6)}`, `relayer ${relayer} has ${formatUnits(rEth, 18, 6)} ETH (fund it)`);
+  check(rEth >= 5n * 10n ** 13n, `relayer ETH ${formatUnits(rEth, 18, 6)}`, `relayer ${relayer} has ${formatUnits(rEth, 18, 6)} ETH (fund it)`);
   check(aAusd >= 10n ** 6n, `agent AUSD ${formatUnits(aAusd, 6, 2)}`, `agent ${agent} has ${formatUnits(aAusd, 6, 2)} AUSD (pnpm setup:fund; needs ${formatUnits(aEth, 18, 6)} ETH → faucet)`);
   const issuer = Wallet.fromSeed(process.env.EXCHANGE_XRPL_SEED!);
   const buyer = Wallet.fromSeed(process.env.AGENT_XRPL_SEED!);

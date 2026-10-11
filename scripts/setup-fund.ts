@@ -13,8 +13,9 @@ import { PROVIDER_ENV, readEnvValue, banner, ok, info, fail, sleep, hasFlag } fr
 
 loadEnv(REPO_ROOT);
 
-const MIN_RELAYER_ETH = 5n * 10n ** 14n; // 0.0005 ETH ≈ thousands of settlements at Base Sepolia gas prices
-const MIN_AGENT_ETH = 2n * 10n ** 13n; // 0.00002 ETH — only for one faucet call
+const MIN_RELAYER_ETH = 10n ** 14n; // 0.0001 ETH ≈ a few hundred settlements at Base Sepolia gas prices (one faucet claim is enough)
+const MIN_AGENT_ETH = 10n ** 13n; // 0.00001 ETH — only for one AUSD faucet call
+const AGENT_TOPUP_ETH = 3n * 10n ** 13n; // what the relayer forwards to the agent if the agent has nothing
 const MIN_AGENT_AUSD = 1_000n * 10n ** 6n;
 
 const need = (k: string) => process.env[k] || fail(`${k} missing — run pnpm setup:wallets`);
@@ -52,8 +53,20 @@ async function main() {
     return missing;
   };
   let missing = await report();
+  // Only the relayer needs a faucet claim: it forwards a sliver to the agent wallet for its one faucet call.
+  const forwardToAgent = async () => {
+    const [r, a] = await Promise.all([ethBalance(relayer), ethBalance(agent)]);
+    if (a >= MIN_AGENT_ETH || r < MIN_RELAYER_ETH + AGENT_TOPUP_ETH) return false;
+    info(`relayer forwards ${formatUnits(AGENT_TOPUP_ETH, 18, 6)} ETH to the agent wallet for its faucet call …`);
+    const w = getWalletClient(need('FACILITATOR_PRIVATE_KEY') as `0x${string}`);
+    const hash = await w.sendTransaction({ to: agent, value: AGENT_TOPUP_ETH });
+    await w.waitForTransactionReceipt({ hash });
+    info(`forwarded  ${basescanTx(hash)}`);
+    return true;
+  };
+  if (missing.length && (await forwardToAgent())) missing = await report();
   if (missing.length) {
-    console.log('\n  Send a little Base Sepolia ETH to the addresses marked ✘, e.g. from:');
+    console.log('\n  Send a little Base Sepolia ETH to the RELAYER (the agent gets topped up from it automatically), e.g. from:');
     console.log('    https://portal.cdp.coinbase.com/products/faucet   (Base Sepolia)');
     console.log('    https://www.alchemy.com/faucets/base-sepolia');
     console.log('  Any faucet drip (0.001+ ETH) is enough. Gas here is ~0.006 gwei.');
@@ -68,6 +81,7 @@ async function main() {
     while (missing.length && Date.now() < deadline) {
       await sleep(10_000);
       missing = await report();
+      if (missing.length && (await forwardToAgent())) missing = await report();
     }
     if (missing.length) fail('still unfunded; re-run pnpm setup:fund when done');
   }
