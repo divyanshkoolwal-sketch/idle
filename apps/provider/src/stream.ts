@@ -35,7 +35,7 @@ export class StreamSession {
   readonly streamId: string;
   readonly channelId: string;
   readonly dropsPerToken: bigint;
-  readonly prior: bigint;
+  private prior: bigint;
   tokensDelivered = 0;
   highestDrops: bigint;
   highestSig?: string;
