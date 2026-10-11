@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Idle — a real-time spot market where AI agents bid for GPU time from data centers. AUSD over x402, XRP over XRPL payment channels, XRPL Credentials as the trust layer.",
+  "description": "Idle \u2014 a real-time spot market where AI agents bid for GPU time from data centers. AUSD over x402, XRP over XRPL payment channels, XRPL Credentials as the trust layer.",
   "packageManager": "pnpm@10.28.0",
   "engines": {
     "node": ">=20.19"
@@ -25,7 +25,8 @@
     "smoke:ollama": "tsx scripts/smoke-ollama.ts",
     "smoke:context": "tsx scripts/smoke-context.ts",
     "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "preflight": "tsx scripts/preflight.ts"
   },
   "dependencies": {
     "@idle/pay-evm": "workspace:*",
