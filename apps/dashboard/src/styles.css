@@ -1,0 +1,113 @@
+@import "tailwindcss";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
+
+@theme {
+  --color-paper: #fafaf7;
+  --color-paper-2: #f2f1eb;
+  --color-ink: #151514;
+  --color-ink-2: #5f5e58;
+  --color-ink-3: #9d9b93;
+  --color-rule: #e3e1d9;
+  --color-rule-2: #cfcdc3;
+  --color-live: #2140e8;
+  --color-live-soft: #e7ebfd;
+  --color-bad: #d42b1f;
+  --color-bad-soft: #fbe8e6;
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, "SF Mono", Menlo, monospace;
+  --ease-out-quint: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-out-quart: cubic-bezier(0.165, 0.84, 0.44, 1);
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.35;
+  overflow: hidden;
+}
+h1, h2, h3 { text-wrap: balance; }
+p { text-wrap: pretty; }
+
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.label {
+  color: var(--color-ink-2);
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+/* winner glow — once, compositor-only */
+@keyframes glow {
+  0% { box-shadow: 0 0 0 0 rgba(33, 64, 232, 0.55); }
+  100% { box-shadow: 0 0 0 16px rgba(33, 64, 232, 0); }
+}
+.glow-once { animation: glow 760ms var(--ease-out-quint) 1; }
+
+/* REVOKED stamp — one-shot slam */
+@keyframes stamp {
+  0% { opacity: 0; transform: rotate(-11deg) scale(1.9); }
+  55% { opacity: 1; transform: rotate(-11deg) scale(0.94); }
+  100% { opacity: 1; transform: rotate(-11deg) scale(1); }
+}
+.stamp { animation: stamp 460ms var(--ease-out-quart) 1 both; will-change: transform, opacity; }
+
+/* live dot */
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+.pulse { animation: pulse 1.8s ease-in-out infinite; }
+
+/* bid bar scale-in */
+.bar-fill { transform-origin: left center; }
+
+/* fade mask for overflowing columns */
+.fade-bottom { mask-image: linear-gradient(to bottom, black 88%, transparent 100%); }
+
+/* focus */
+:focus-visible { outline: 2px solid var(--color-live); outline-offset: 2px; }
+
+/* buttons */
+.btn {
+  border: 1px solid var(--color-rule-2);
+  border-radius: 8px;
+  padding: 8px 12px;
+  min-height: 40px;
+  background: white;
+  color: var(--color-ink);
+  font-size: 14px;
+  transition-property: transform, background-color, border-color;
+  transition-duration: 120ms;
+  transition-timing-function: ease-out;
+}
+.btn:active { transform: scale(0.97); }
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover { background: var(--color-paper-2); }
+}
+.btn-primary { background: var(--color-ink); color: white; border-color: var(--color-ink); }
+@media (hover: hover) and (pointer: fine) {
+  .btn-primary:hover { background: #2a2a28; }
+}
+.input {
+  border: 1px solid var(--color-rule-2);
+  border-radius: 8px;
+  padding: 8px 10px;
+  min-height: 40px;
+  background: white;
+  font-size: 16px;
+  width: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glow-once, .pulse { animation: none; }
+  .stamp { animation: none; opacity: 1; transform: rotate(-11deg); }
+  * { transition-duration: 0ms !important; }
+}
