@@ -207,7 +207,10 @@ export class Market {
 
     let verification: JobResult['verification'] = { sampled: false };
     if (state.jobType === 'embed' && output.embeddings) {
-      verification = await verifier.spotCheck(p, q.jobId, texts, output.embeddings);
+      // Suspiciously cheap work is always checked: a bid below the provider's own declared floor, or any prior strike.
+      const winnerBid = q.bids.find((b) => b.providerId === p.id)?.unitPrice;
+      const suspicious = (winnerBid !== undefined && BigInt(winnerBid) < BigInt(p.floors.embed)) || p.strikes > 0;
+      verification = await verifier.spotCheck(p, q.jobId, texts, output.embeddings, suspicious);
       if (verification.sampled && verification.passed === false) {
         return fail('PROVIDER_FAILED_VERIFICATION', `spot check failed (cosine ${verification.cosine?.toFixed(4)})`, { cosine: verification.cosine, latencyMs });
       }
