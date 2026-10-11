@@ -79,26 +79,45 @@ export interface ReplayStatus {
   loop: boolean;
 }
 
-/** Plays frames with their original relative timing (gaps capped) at a speed multiplier. */
+/**
+ * Plays frames with their original relative timing (gaps capped at 4 s) at a speed multiplier.
+ * Scheduling is anchored to wall-clock time, and late frames are dispatched in a batch, so the
+ * replay never drifts behind its own clock when rendering is slower than the frame gaps.
+ */
 export class ReplayPlayer {
   private idx = 0;
   private timer: ReturnType<typeof setTimeout> | undefined;
   private _playing = false;
+  private vts: number[] = []; // virtual timeline (ms) with capped gaps
+  private anchorWall = 0;
+  private anchorV = 0;
   speed = 1;
   loop = true;
   constructor(
     private frames: DashboardEvent[],
     private onEvent: (ev: DashboardEvent) => void,
     private onStatus: (s: ReplayStatus) => void,
-  ) {}
+  ) {
+    let v = 0;
+    this.vts = frames.map((f, i) => {
+      if (i > 0) v += Math.min(Math.max(f.ts - frames[i - 1].ts, 0), 4000);
+      return v;
+    });
+  }
 
   status(): ReplayStatus {
     return { playing: this._playing, speed: this.speed, index: this.idx, total: this.frames.length, loop: this.loop };
   }
 
+  private anchor() {
+    this.anchorWall = performance.now();
+    this.anchorV = this.vts[Math.min(this.idx, this.vts.length - 1)] ?? 0;
+  }
+
   play() {
     if (this._playing) return;
     this._playing = true;
+    this.anchor();
     this.onStatus(this.status());
     this.step();
   }
@@ -112,6 +131,7 @@ export class ReplayPlayer {
 
   setSpeed(x: number) {
     this.speed = x;
+    this.anchor();
     this.onStatus(this.status());
   }
 
@@ -125,23 +145,33 @@ export class ReplayPlayer {
     this.pause();
   }
 
+  private due(i: number): number {
+    return this.anchorWall + (this.vts[i] - this.anchorV) / this.speed;
+  }
+
   private step = () => {
     if (!this._playing) return;
     if (this.idx >= this.frames.length) {
       if (this.loop) {
         this.idx = 0;
-        this.timer = setTimeout(this.step, 2500 / this.speed);
+        this.timer = setTimeout(() => {
+          this.anchor();
+          this.step();
+        }, 2500 / this.speed);
       } else {
         this.pause();
       }
       return;
     }
-    const ev = this.frames[this.idx];
-    this.onEvent(ev);
-    this.idx += 1;
-    this.onStatus(this.status());
-    const next = this.frames[this.idx];
-    const gap = next ? Math.min(Math.max(next.ts - ev.ts, 0), 4000) : 2000;
-    this.timer = setTimeout(this.step, gap / this.speed);
+    const now = performance.now();
+    let n = 0;
+    while (this.idx < this.frames.length && this.due(this.idx) <= now && n < 200) {
+      this.onEvent(this.frames[this.idx]);
+      this.idx += 1;
+      n += 1;
+    }
+    if (n > 0) this.onStatus(this.status());
+    const wait = this.idx < this.frames.length ? Math.max(0, this.due(this.idx) - performance.now()) : 0;
+    this.timer = setTimeout(this.step, wait);
   };
 }

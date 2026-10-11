@@ -21,7 +21,9 @@ export class Verifier {
 
     let ref: number[][] | undefined;
     let via: 'provider' | 'reference' = 'reference';
-    const other = registry.eligible({ model: config.embedModel, jobType: 'embed' }).find((x) => x.id !== p.id);
+    const others = registry.eligible({ model: config.embedModel, jobType: 'embed' }).filter((x) => x.id !== p.id);
+    // random verifier so a colluding partner cannot be chosen deterministically; reference-only once suspected
+    const other = p.strikes > 0 || others.length === 0 ? undefined : others[Math.floor(Math.random() * others.length)];
     if (other) {
       ref = await market.dispatchInternal(other, 'embed', { texts: sample }, config.embedModel, 8000).then((o) => o?.embeddings).catch(() => undefined);
       if (ref && ref.length === sample.length) via = 'provider';

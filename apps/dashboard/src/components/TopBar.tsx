@@ -30,16 +30,32 @@ export function TopBar({ state, controls, route }: { state: MarketState; control
   const verified = providers.filter((p) => p.online && p.status === 'verified').length;
   const live = controls.mode === 'live';
   const dotClass = live ? (controls.conn === 'open' ? 'bg-live pulse' : 'bg-ink-3') : 'bg-ink';
-  const statusText = live ? (controls.conn === 'open' ? 'live' : controls.conn === 'connecting' ? 'connecting' : 'reconnecting') : `replay ×${controls.replay?.speed ?? 1}`;
+  const statusText = live ? (controls.conn === 'open' ? 'live' : controls.conn === 'connecting' ? 'connecting' : 'reconnecting') : '';
+  const replayLabel =
+    controls.replayReason === 'fallback' || controls.replayReason === 'default'
+      ? 'Replay · recorded run'
+      : controls.replayName
+        ? `Replay · ${controls.replayName}`
+        : 'Replay';
 
   return (
     <header className="h-[76px] shrink-0 border-b border-rule flex items-center gap-10 px-7">
-      <div className="flex items-center gap-3 w-[170px] shrink-0">
+      <div className="flex items-center gap-3 w-[250px] shrink-0">
         <a href="/" className="text-[28px] font-semibold tracking-[-0.03em] leading-none">
           Idle
         </a>
-        <span className={clsx('inline-block w-2.5 h-2.5 rounded-full', dotClass)} aria-hidden />
-        <span className="text-[13px] text-ink-2 whitespace-nowrap">{statusText}</span>
+        {live ? (
+          <>
+            <span className={clsx('inline-block w-2.5 h-2.5 rounded-full', dotClass)} aria-hidden />
+            <span className="text-[13px] text-ink-2 whitespace-nowrap">{statusText}</span>
+          </>
+        ) : (
+          <span className="inline-flex items-center gap-2 text-[12px] text-ink border border-rule-2 rounded-md px-2 py-0.5 whitespace-nowrap" title={controls.replayReason === 'fallback' ? 'The live exchange was not reachable; playing the recorded run.' : undefined}>
+            <span className={clsx('inline-block w-2 h-2 rounded-full', dotClass)} aria-hidden />
+            {replayLabel}
+            {controls.replay ? <span className="num text-ink-3">×{controls.replay.speed}</span> : null}
+          </span>
+        )}
       </div>
 
       <Stat label="Jobs cleared">
@@ -84,10 +100,10 @@ export function TopBar({ state, controls, route }: { state: MarketState; control
             </span>
           </div>
         )}
-        <a href="/" className={clsx('px-3 py-2 rounded-md', route === 'market' ? 'bg-paper-2 text-ink' : 'text-ink-2')}>
+        <a href={`/${location.search}`} className={clsx('px-3 py-2.5 rounded-md min-h-10 inline-flex items-center', route === 'market' ? 'bg-paper-2 text-ink' : 'text-ink-2')}>
           Market
         </a>
-        <a href="/agent" className={clsx('px-3 py-2 rounded-md', route === 'agent' ? 'bg-paper-2 text-ink' : 'text-ink-2')}>
+        <a href={`/agent${location.search}`} className={clsx('px-3 py-2.5 rounded-md min-h-10 inline-flex items-center', route === 'agent' ? 'bg-paper-2 text-ink' : 'text-ink-2')}>
           Agents
         </a>
       </nav>

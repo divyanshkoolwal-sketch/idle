@@ -4,7 +4,7 @@
  */
 import { z } from 'zod';
 
-export const Atomic = z.string().regex(/^\d+$/, 'atomic amount must be a non-negative integer string');
+export const Atomic = z.string().max(30).regex(/^\d+$/, 'atomic amount must be a non-negative integer string');
 export const JobType = z.enum(['embed', 'generate', 'stream']);
 export const Currency = z.enum(['AUSD', 'XRP']);
 export const Tier = z.enum(['A', 'B']);
@@ -49,7 +49,9 @@ export const ProviderMessage = z.discriminatedUnion('type', [
     benchmark: Benchmark,
     floors: z.object({ embed: Atomic, generate: Atomic, streamDrops: Atomic }),
     cheat: z.boolean().default(false),
-    version: z.string().default('0.1.0'),
+    version: z.string().max(32).default('0.1.0'),
+    /** proof of XRPL key possession: sign("idle-hello|xrplAddress|evmAddress|ts|nonce") */
+    proof: z.object({ ts: z.number(), nonce: z.string().min(8).max(64), signature: z.string().max(256) }),
   }),
   z.object({ type: z.literal('challenge.result'), challengeId: z.string(), embeddings: z.array(z.array(z.number())), ms: z.number() }),
   z.object({ type: z.literal('credential.accepted'), txHash: z.string() }),
@@ -88,8 +90,8 @@ export const ProviderMessage = z.discriminatedUnion('type', [
 export type ProviderMessage = z.infer<typeof ProviderMessage>;
 
 export const JobInput = z.object({
-  texts: z.array(z.string()).optional(),
-  prompt: z.string().optional(),
+  texts: z.array(z.string().max(8_000)).max(64).optional(),
+  prompt: z.string().max(16_000).optional(),
   maxTokens: z.number().int().positive().optional(),
   temperature: z.number().optional(),
   seed: z.number().optional(),
@@ -254,10 +256,10 @@ export const JobView = z.object({
 export type JobView = z.infer<typeof JobView>;
 
 export const AgentLog = z.object({
-  agentId: z.string(),
-  persona: z.string(),
+  agentId: z.string().max(64),
+  persona: z.string().max(64),
   kind: z.enum(['thought', 'action', 'spend', 'result', 'error']),
-  text: z.string(),
+  text: z.string().max(2_000),
   ts: z.number(),
   meta: z.record(z.string(), z.unknown()).optional(),
 });
@@ -337,10 +339,10 @@ export const CreateJobRequest = z.object({
   model: z.string().optional(),
   input: JobInput,
   maxUnitPrice: Atomic,
-  deadlineMs: z.number().int().positive().default(10_000),
+  deadlineMs: z.number().int().positive().max(180_000).default(10_000),
   minTier: Tier.optional(),
-  persona: z.string().optional(),
-  agentId: z.string().optional(),
+  persona: z.string().max(64).optional(),
+  agentId: z.string().max(64).optional(),
 });
 export type CreateJobRequest = z.infer<typeof CreateJobRequest>;
 
@@ -388,13 +390,13 @@ export type ProviderFailed = z.infer<typeof ProviderFailed>;
 
 /** POST /v1/streams */
 export const CreateStreamRequest = z.object({
-  model: z.string().optional(),
-  prompt: z.string(),
+  model: z.string().max(64).optional(),
+  prompt: z.string().min(1).max(16_000),
   maxTokens: z.number().int().positive().max(2048),
   maxDropsPerToken: Atomic,
-  deadlineMs: z.number().int().positive().default(15_000),
-  persona: z.string().optional(),
-  agentId: z.string().optional(),
+  deadlineMs: z.number().int().positive().max(180_000).default(15_000),
+  persona: z.string().max(64).optional(),
+  agentId: z.string().max(64).optional(),
 });
 export type CreateStreamRequest = z.infer<typeof CreateStreamRequest>;
 export const StreamQuote = z.object({
@@ -444,5 +446,5 @@ export type MarketSnapshot = z.infer<typeof MarketSnapshot>;
 export const AgentLogRequest = AgentLog.omit({ agentId: true, ts: true }).extend({ ts: z.number().optional() });
 
 /** POST /v1/admin/{burst|cheat|drain} — bearer ADMIN_TOKEN */
-export const AdminBurst = z.object({ jobs: z.number().int().positive().default(20), jobType: z.enum(['embed', 'generate']).default('embed') });
+export const AdminBurst = z.object({ jobs: z.number().int().positive().max(200).default(20), jobType: z.enum(['embed', 'generate']).default('embed') });
 export const AdminProviderToggle = z.object({ providerId: z.string(), on: z.boolean() });

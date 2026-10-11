@@ -1,3 +1,4 @@
+import { verifyHelloProof } from '@idle/pay-xrpl';
 import type { WebSocket } from 'ws';
 import { ProviderMessage, cosine, GOLDEN_TEXTS } from '@idle/shared';
 import type { ExchangeMessage, ProviderView, ProviderStatus, Tier, JobType } from '@idle/shared';
@@ -261,7 +262,24 @@ export class ProviderRegistry {
     }
   }
 
+  private seenNonces = new Map<string, number>();
+
   private onHello(ws: WebSocket, msg: Hello): string {
+    // Identity: the hello must be signed by the XRPL key that owns xrplAddress (prevents payout redirection).
+    const bad = verifyHelloProof(msg);
+    for (const [n, t] of this.seenNonces) if (Date.now() - t > 10 * 60_000) this.seenNonces.delete(n);
+    const reason = bad ?? (this.seenNonces.has(msg.proof.nonce) ? 'proof nonce reused' : null);
+    if (reason) {
+      console.warn(`[providers] rejected hello from ${msg.name} (${msg.xrplAddress}): ${reason}`);
+      try {
+        ws.send(JSON.stringify({ type: 'error', code: 'BAD_PROOF', message: reason }));
+      } catch {
+        /* ignore */
+      }
+      ws.close(4001, 'bad proof');
+      return '';
+    }
+    this.seenNonces.set(msg.proof.nonce, Date.now());
     let p: LiveProvider | undefined;
     if (msg.providerId) {
       const cand = this.providers.get(msg.providerId);

@@ -13,6 +13,7 @@ export interface ChannelInfo {
   publicKey?: string;
   settleDelay: number;
   expiration?: number;
+  cancelAfter?: number;
 }
 
 export async function openChannel(
@@ -66,6 +67,7 @@ export async function listChannels(account: string, destination?: string): Promi
     publicKey: c.public_key_hex ?? c.public_key,
     settleDelay: c.settle_delay,
     expiration: c.expiration,
+    cancelAfter: c.cancel_after,
   }));
 }
 
@@ -83,6 +85,7 @@ export async function getChannel(channelId: string): Promise<ChannelInfo | null>
       publicKey: node.PublicKey ? String(node.PublicKey) : undefined,
       settleDelay: Number(node.SettleDelay),
       expiration: typeof node.Expiration === 'number' ? node.Expiration : undefined,
+      cancelAfter: typeof node.CancelAfter === 'number' ? node.CancelAfter : undefined,
     };
   } catch (e: unknown) {
     const code = (e as { data?: { error?: string } }).data?.error ?? (e as Error).message ?? '';

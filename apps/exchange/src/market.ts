@@ -79,6 +79,9 @@ export class Market {
       input = { ...req.input, maxTokens };
       units = maxTokens; // charged on maxTokens
     }
+    if (jobType === 'embed' && req.model && req.model !== config.embedModel) {
+      return { kind: 'bad_request', message: `embed jobs run on ${config.embedModel} (verification needs matching models)` };
+    }
     const model = req.model ?? (jobType === 'embed' ? config.embedModel : config.genModel);
     const jobId = newId('j');
     const quoteId = newId('q');
@@ -203,7 +206,9 @@ export class Market {
     if (state.jobType === 'embed' && (!output.embeddings || output.embeddings.length !== texts.length)) {
       return fail('PROVIDER_ERROR', `expected ${texts.length} embeddings, got ${output.embeddings?.length ?? 0}`, { latencyMs });
     }
-    if (state.jobType === 'generate' && typeof output.text !== 'string') return fail('PROVIDER_ERROR', 'no text in generate result', { latencyMs });
+    if (state.jobType === 'generate' && (typeof output.text !== 'string' || output.text.trim().length === 0 || !(Number(output.tokens ?? 0) > 0))) {
+      return fail('PROVIDER_ERROR', 'empty generate result', { latencyMs });
+    }
 
     let verification: JobResult['verification'] = { sampled: false };
     if (state.jobType === 'embed' && output.embeddings) {

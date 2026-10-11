@@ -79,9 +79,17 @@ async function main() {
 
   const server = http.createServer(app);
   const wss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024 * 1024 });
+  process.on('uncaughtException', (e) => console.error('[exchange] uncaughtException:', e));
+  process.on('unhandledRejection', (e) => console.error('[exchange] unhandledRejection:', e));
   server.on('upgrade', (req, socket, head) => {
-    const url = new URL(req.url ?? '/', 'http://localhost');
-    const p = url.pathname;
+    let p: string;
+    try {
+      p = new URL(req.url ?? '/', 'http://localhost').pathname;
+      if (p.startsWith('/v1/streams/')) decodeURIComponent(p.slice('/v1/streams/'.length));
+    } catch {
+      socket.destroy();
+      return;
+    }
     if (p === '/v1/providers/ws') {
       wss.handleUpgrade(req, socket, head, (ws) => ctx.registry.handleSocket(ws));
     } else if (p === '/v1/events') {

@@ -18,6 +18,8 @@ export interface GateQuote {
 export interface GateVerified {
   kind: 'verified';
   payer?: string;
+  /** EIP-3009 authorization the facilitator verified (undefined for non-EIP-3009 payloads) */
+  authorization?: { from: string; to: string; value: string; validAfter: string; validBefore: string; nonce: string };
   /** Settle now (after the work passed verification). Sets the PAYMENT-RESPONSE header on success. */
   settle: () => Promise<{ success: true; txHash: string; explorerUrl: string; payer?: string } | { success: false; reason: string; message?: string }>;
   /** Do not settle (work failed verification). */
@@ -54,6 +56,10 @@ export function createAusdGate(opts: { routePattern: string; facilitatorUrl?: st
    */
   async function check(req: Request, res: Response, quote: GateQuote): Promise<GateOutcome> {
     await initialize();
+    if (!quote || !quote.payTo || quote.amount <= 0n) {
+      res.status(500).json({ error: 'GATE_NO_QUOTE' });
+      return { kind: 'responded', status: 500 };
+    }
     quotes.set(req, quote);
     const ctx = requestContext(req);
     const result = await http.processHTTPRequest(ctx);
@@ -70,10 +76,12 @@ export function createAusdGate(opts: { routePattern: string; facilitatorUrl?: st
       return { kind: 'responded', status: result.response.status };
     }
     const { paymentPayload, paymentRequirements, declaredExtensions, cancellationDispatcher } = result;
-    const payer = (paymentPayload.payload as { authorization?: { from?: string } })?.authorization?.from;
+    const authorization = (paymentPayload.payload as { authorization?: GateVerified['authorization'] })?.authorization;
+    const payer = authorization?.from;
     return {
       kind: 'verified',
       payer,
+      authorization,
       settle: async () => {
         const s = await http.processSettlement(paymentPayload, paymentRequirements, declaredExtensions, { request: ctx });
         if (!s.success) return { success: false, reason: s.errorReason, message: s.errorMessage };

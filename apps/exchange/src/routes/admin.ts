@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { timingSafeEqual } from 'node:crypto';
 import type { Request, Response, NextFunction } from 'express';
 import { AdminBurst, AdminProviderToggle } from '@idle/shared';
 import type { Ctx } from '../context';
@@ -12,7 +13,9 @@ export function adminRoutes(ctx: Ctx): Router {
       return;
     }
     const h = req.header('authorization') ?? '';
-    if (h !== `Bearer ${ctx.config.adminToken}`) {
+    const want = Buffer.from(`Bearer ${ctx.config.adminToken}`);
+    const got = Buffer.from(h);
+    if (got.length !== want.length || !timingSafeEqual(got, want)) {
       res.status(401).json({ error: 'UNAUTHORIZED' });
       return;
     }

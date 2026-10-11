@@ -123,8 +123,12 @@ export class StreamSession {
   }
 
   /** Buyer claim relayed by the exchange. Keeps the highest valid cumulative claim. */
+  private channelAmount = 0n;
+
   onClaim(amountDrops: bigint, signature: string): { ok: boolean; reason?: string } {
     if (amountDrops <= this.highestDrops) return { ok: false, reason: `claim ${amountDrops} not above current ${this.highestDrops}` };
+    // An inflated claim above the channel's funding would be unredeemable and must not supersede honest ones.
+    if (this.channelAmount > 0n && amountDrops > this.channelAmount) return { ok: false, reason: `claim ${amountDrops} exceeds channel amount ${this.channelAmount}` };
     if (!verifyClaim(this.channelId, amountDrops, signature, this.start.buyerPublicKey)) {
       this.deps.log.warn(`stream ${this.streamId}: invalid claim signature for ${amountDrops} drops`);
       return { ok: false, reason: 'bad signature' };
@@ -157,6 +161,14 @@ export class StreamSession {
     if (ch.account !== this.start.buyerAddress) return `channel owner ${ch.account} is not the buyer`;
     if ((ch.publicKey ?? '').toUpperCase() !== this.start.buyerPublicKey.toUpperCase()) return 'channel public key does not match buyer';
     if (ch.expiration !== undefined) return 'channel is expiring';
+    if (ch.cancelAfter !== undefined) return 'channel has CancelAfter set';
+    if (ch.settleDelay < 30) return `settleDelay ${ch.settleDelay}s is too short (need ≥ 30 s to redeem)`;
+    // Baseline can never be below what the ledger already shows as claimed (a buyer cannot understate prior).
+    if (ch.balanceDrops > this.prior) {
+      this.prior = ch.balanceDrops;
+      if (this.highestDrops < this.prior) this.highestDrops = this.prior;
+    }
+    this.channelAmount = ch.amountDrops;
     const committed = ch.balanceDrops > this.prior ? ch.balanceDrops : this.prior;
     const remaining = ch.amountDrops - committed;
     const need = BigInt(this.window) * this.dropsPerToken;

@@ -82,7 +82,8 @@ export function createPaidFetch(opts: { privateKey: Hex; policy: SpendPolicy; ba
               r.network === BASE_SEPOLIA_CAIP2 &&
               r.asset.toLowerCase() === asset.toLowerCase() &&
               safeBig(r.amount) >= 0n &&
-              safeBig(r.amount) <= policy.maxPerPayment,
+              safeBig(r.amount) <= policy.maxPerPayment &&
+              r.maxTimeoutSeconds <= 300,
           ),
       ],
     });
@@ -96,13 +97,16 @@ export function createPaidFetch(opts: { privateKey: Hex; policy: SpendPolicy; ba
         state.abortReason = `budget exhausted: need ${amount}, remaining ${tracker.remaining}`;
         return { abort: true, reason: state.abortReason };
       }
-      if (policy.isPayeeAllowed && !(await policy.isPayeeAllowed(r.payTo, r))) {
-        state.abortReason = `payee ${r.payTo} not allowed`;
-        return { abort: true, reason: state.abortReason };
-      }
+      // reserve before any await so concurrent calls cannot all pass the budget check
       tracker.reserved += amount;
       state.amount = amount;
       state.payTo = r.payTo;
+      if (policy.isPayeeAllowed && !(await policy.isPayeeAllowed(r.payTo, r))) {
+        tracker.reserved -= amount;
+        state.amount = undefined;
+        state.abortReason = `payee ${r.payTo} not allowed`;
+        return { abort: true, reason: state.abortReason };
+      }
     });
     return client;
   };

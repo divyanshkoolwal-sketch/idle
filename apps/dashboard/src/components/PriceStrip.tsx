@@ -8,15 +8,20 @@ const WINDOW = 10 * 60_000;
 
 function Small({ title, unit, jobType, state }: { title: string; unit: string; jobType: JobType; state: MarketState }) {
   const now = state.now || Date.now();
-  const data = state.prices.filter((p) => p.jobType === jobType).map((p) => ({ ts: p.ts, v: Number(p.unitPrice) }));
-  // last 10 minutes, but when the session is younger than that, fit the session so the line fills the panel
-  const firstAny = state.prices[0]?.ts ?? now;
-  const from = Math.max(now - WINDOW, Math.min(firstAny - 5_000, now - 30_000));
-  const last = data.at(-1);
-  const vals = data.map((d) => d.v);
+  const ticks = state.prices.filter((p) => p.jobType === jobType).map((p) => ({ ts: p.ts, v: Number(p.unitPrice) }));
+  const last = ticks.at(-1);
+  const clears = ticks.length;
+  const vals = ticks.map((d) => d.v);
   const lo = vals.length ? Math.min(...vals) : 0;
   const hi = vals.length ? Math.max(...vals) : 1;
   const pad = Math.max(1, Math.round((hi - lo) * 0.25));
+  // last 10 minutes, but when the session is younger than that, fit the session so the line fills the panel
+  const firstAny = state.prices[0]?.ts ?? now;
+  const from = Math.max(now - WINDOW, Math.min(firstAny - 5_000, now - 30_000));
+  const lead = Math.max(1_500, Math.round((now - from) * 0.05)); // headroom on the right so a fresh step is visible
+  const to = now + lead;
+  // carry the latest price to the edge: clearing price is a step function
+  const data = last ? [...ticks, { ts: to, v: last.v }] : ticks;
   return (
     <div className="flex-1 min-w-0 flex gap-4">
       <div className="w-[120px] shrink-0">
@@ -26,9 +31,9 @@ function Small({ title, unit, jobType, state }: { title: string; unit: string; j
         </div>
         <div className="label mt-1.5">{unit}</div>
         <div className="label mt-0.5">
-          {data.length ? (
+          {clears ? (
             <>
-              <span className="num">{data.length}</span> clears, 10 min
+              <span className="num">{clears}</span> clears, 10 min
             </>
           ) : (
             'no clears yet'
@@ -39,7 +44,7 @@ function Small({ title, unit, jobType, state }: { title: string; unit: string; j
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
             <CartesianGrid vertical={false} stroke="#e3e1d9" strokeDasharray="0" />
-            <XAxis type="number" dataKey="ts" domain={[from, now]} hide />
+            <XAxis type="number" dataKey="ts" domain={[from, to]} hide />
             <YAxis domain={[Math.max(0, lo - pad), hi + pad]} width={34} tick={{ fontSize: 11, fill: '#9d9b93', fontFamily: 'Geist Mono Variable' }} axisLine={false} tickLine={false} tickCount={3} />
             <Tooltip
               cursor={{ stroke: '#cfcdc3', strokeWidth: 1 }}

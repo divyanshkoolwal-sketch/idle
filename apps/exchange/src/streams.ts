@@ -27,6 +27,7 @@ interface Session {
   dropsPerToken: bigint;
   tokensDelivered: number;
   authorizedDrops: bigint;
+  priorDrops: bigint;
   claimedDrops: bigint;
   channelId: string;
   buyerAddress: string;
@@ -172,6 +173,11 @@ export class StreamHub {
 
   private open(ws: WebSocket, state: StreamQuoteState, msg: Extract<StreamClientMessage, { type: 'open' }>): Session | undefined {
     const { registry, repo, events } = this.ctx;
+    if (state.consumed) {
+      this.sendAgent(ws, { type: 'error', code: 'QUOTE_CONSUMED', message: 'this stream quote was already opened' });
+      ws.close(4006, 'quote consumed');
+      return undefined;
+    }
     const p = registry.get(state.providerId);
     if (!p || !p.online || p.status !== 'verified') {
       this.sendAgent(ws, { type: 'error', code: 'PROVIDER_OFFLINE', message: 'winning provider is no longer available' });
@@ -194,6 +200,7 @@ export class StreamHub {
       dropsPerToken: BigInt(state.quote.dropsPerToken),
       tokensDelivered: 0,
       authorizedDrops: BigInt(msg.priorClaimedDrops),
+      priorDrops: BigInt(msg.priorClaimedDrops),
       claimedDrops: 0n,
       channelId: msg.channelId,
       buyerAddress: msg.buyerAddress,
@@ -278,7 +285,7 @@ export class StreamHub {
           auction_id: repo.getJob(s.jobId)?.auction_id ?? null,
           rail: 'xrpl',
           currency: 'XRP',
-          amount_atomic: msg.drops,
+          amount_atomic: (drops > s.priorDrops ? drops - s.priorDrops : 0n).toString(),
           payer: s.buyerAddress,
           payee: p.xrplAddress,
           payee_provider_id: p.id,
@@ -288,7 +295,7 @@ export class StreamHub {
           created_at: now(),
         };
         repo.insertPayment(payment);
-        p.earningsDrops += drops;
+        p.earningsDrops += drops > s.priorDrops ? drops - s.priorDrops : 0n;
         repo.updateProvider(p.id, { earnings_drops: p.earningsDrops.toString() });
         events.emit({ type: 'paychan.claimed', streamId: s.streamId, providerId: p.id, txHash: msg.txHash, drops: msg.drops, tokens: msg.tokens });
         events.emit({ type: 'payment.settled', payment: paymentView(payment, registry.nameOf) });

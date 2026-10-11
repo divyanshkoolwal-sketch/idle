@@ -58,7 +58,8 @@ export class MarketClient {
       policy: {
         maxPerPayment: ceiling,
         budget,
-        isPayeeAllowed: (payTo) => !!this.lastQuote && payTo.toLowerCase() === this.lastQuote.payTo.toLowerCase(),
+        // the payee must be the quoted winner AND the amount must be exactly the quoted amount
+        isPayeeAllowed: (payTo, req) => !!this.lastQuote && payTo.toLowerCase() === this.lastQuote.payTo.toLowerCase() && req.amount === this.lastQuote.amount,
         onSpend: (e) => {
           if (e.ok && e.txHash) this.receipts.push({ amount: e.amount, payTo: e.payTo, txHash: e.txHash, explorerUrl: `https://sepolia.basescan.org/tx/${e.txHash}` });
           if (e.ok) this.log.spend(`paid ${formatUnits(e.amount, 6, 4)} AUSD → ${short(e.payTo)}  tx ${e.txHash}`, { amount: e.amount.toString(), payTo: e.payTo, txHash: e.txHash });
@@ -184,9 +185,9 @@ export class MarketClient {
         maxUnitPrice = next;
         continue;
       }
-      if (first.status === 503) {
+      if (first.status === 503 || first.status === 429) {
         const wait = Number(json.retryAfterMs ?? 1000);
-        this.log.thought(`no free capacity; retrying in ${wait} ms`);
+        this.log.thought(`${first.status === 429 ? 'rate limited' : 'no free capacity'}; retrying in ${wait} ms`);
         await sleep(wait);
         continue;
       }

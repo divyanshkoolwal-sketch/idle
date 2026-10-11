@@ -1,3 +1,4 @@
+import { signHelloProof } from '@idle/pay-xrpl';
 import { decodeCredentialType } from './credential';
 import { acceptCredential, disconnectXrpl } from '@idle/pay-xrpl';
 import { xrplTx } from '@idle/shared';
@@ -145,6 +146,7 @@ export class ProviderDaemon {
       floors: { embed: cfg.floors.embed.toString(), generate: cfg.floors.generate.toString(), streamDrops: cfg.floors.streamDrops.toString() },
       cheat: this.cheat,
       version: '0.1.0',
+      proof: signHelloProof(wallets.xrpl, wallets.evmAddress),
     });
   }
 

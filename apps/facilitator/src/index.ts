@@ -6,10 +6,11 @@ import { createFacilitator } from './app';
 loadEnv(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'));
 
 const port = envInt('FACILITATOR_PORT', 4022);
+const host = process.env.FACILITATOR_HOST || '127.0.0.1'; // loopback only: the exchange is the only caller
 const { app, address, wallet } = createFacilitator(env('FACILITATOR_PRIVATE_KEY') as `0x${string}`);
 
-app.listen(port, async () => {
-  console.log(`[facilitator] listening on :${port}  relayer=${address}`);
+app.listen(port, host, async () => {
+  console.log(`[facilitator] listening on ${host}:${port}  relayer=${address}`);
   try {
     const bal = await wallet.getBalance({ address });
     console.log(`[facilitator] relayer ETH balance: ${formatUnits(bal, 18, 6)}`);

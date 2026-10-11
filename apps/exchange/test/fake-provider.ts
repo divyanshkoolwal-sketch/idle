@@ -11,7 +11,7 @@ import { Wallet } from 'xrpl';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import { ExchangeMessage, loadEnv, REPO_ROOT } from '@idle/shared';
 import type { ProviderMessage } from '@idle/shared';
-import { acceptCredential, disconnectXrpl, ensureFunded } from '@idle/pay-xrpl';
+import { acceptCredential, disconnectXrpl, ensureFunded, signHelloProof } from '@idle/pay-xrpl';
 import { ollamaEmbed } from '../src/reference';
 
 loadEnv(REPO_ROOT);
@@ -107,6 +107,7 @@ function connect() {
       floors: { embed: FLOOR_EMBED.toString(), generate: FLOOR_GEN.toString(), streamDrops: FLOOR_STREAM.toString() },
       cheat,
       version: 'fake-0.1',
+      proof: signHelloProof(xrpl, evm),
     });
     hb = setInterval(() => send({ type: 'heartbeat', busySlots: busy, queueDepth: queue, shade, surge: surge(), asks: asks(), draining, cheat }), 1000);
   });

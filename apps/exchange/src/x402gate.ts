@@ -12,6 +12,15 @@ import { paymentView } from './views';
 import { newId, now } from './ids';
 
 let instance: ReturnType<typeof createAusdGate> | null = null;
+/** (payer:nonce) → validBefore (unix s). A verified authorization may only be used for one job. */
+const usedNonces = new Map<string, number>();
+function nonceUsed(key: string, validBefore: number): boolean {
+  const nowS = Math.floor(Date.now() / 1000);
+  for (const [k, exp] of usedNonces) if (exp < nowS) usedNonces.delete(k);
+  if (usedNonces.has(key)) return true;
+  usedNonces.set(key, validBefore);
+  return false;
+}
 function ausdGate() {
   return (instance ??= createAusdGate({
     routePattern: 'POST /v1/jobs',
@@ -36,6 +45,23 @@ export async function gate(req: Request, res: Response, state: QuoteState, ctx: 
   }
   if (g.kind === 'responded') return; // 402 sent (first call) or a payment error
 
+  // The authorization must outlive the job + settlement, and may be used once.
+  const auth = g.authorization;
+  if (auth) {
+    const validBefore = Number(auth.validBefore);
+    const needUntil = Math.floor(Date.now() / 1000) + Math.ceil(state.deadlineMs / 1000) + 45;
+    if (!Number.isFinite(validBefore) || validBefore < needUntil) {
+      await g.abandon('authorization_too_short');
+      res.status(400).json({ error: 'AUTHORIZATION_TOO_SHORT', message: `validBefore must be ≥ now + deadline + 45 s (need ${needUntil}, got ${validBefore})`, charged: false });
+      return;
+    }
+    if (nonceUsed(`${auth.from.toLowerCase()}:${auth.nonce.toLowerCase()}`, validBefore)) {
+      await g.abandon('nonce_reused');
+      res.status(409).json({ error: 'AUTHORIZATION_REUSED', message: 'this signed authorization was already used for a job', charged: false });
+      return;
+    }
+  }
+
   // Signed authorization verified by our facilitator. Record it; nothing has moved on-chain yet.
   const payment: PaymentRow = {
     id: newId('pay'),
@@ -55,7 +81,18 @@ export async function gate(req: Request, res: Response, state: QuoteState, ctx: 
   repo.insertPayment(payment);
   events.emit({ type: 'payment.verified', payment: paymentView(payment, registry.nameOf) });
 
-  const run = await market.runJob(state);
+  let run;
+  try {
+    run = await market.runJob(state);
+  } catch (e) {
+    await g.abandon('exception');
+    const reason = `exception: ${e instanceof Error ? e.message : String(e)}`;
+    console.error(`[x402] runJob threw for ${quote.jobId}: ${reason}`);
+    repo.updatePayment(payment.id, { status: 'not_settled', reason });
+    events.emit({ type: 'payment.not_settled', payment: paymentView({ ...payment, status: 'not_settled', reason }, registry.nameOf) });
+    res.status(502).json({ error: 'PROVIDER_ERROR', charged: false, jobId: quote.jobId, providerId: quote.providerId });
+    return;
+  }
   if (!run.ok) {
     await g.abandon(run.code);
     const reason = run.code === 'PROVIDER_FAILED_VERIFICATION' ? `spot check failed (cosine ${run.cosine?.toFixed(4) ?? '?'})` : run.error ?? run.code;
@@ -70,14 +107,20 @@ export async function gate(req: Request, res: Response, state: QuoteState, ctx: 
     return;
   }
 
-  const settled = await g.settle();
+  let settled: Awaited<ReturnType<typeof g.settle>>;
+  try {
+    settled = await g.settle();
+  } catch (e) {
+    settled = { success: false, reason: 'settle_exception', message: e instanceof Error ? e.message : String(e) };
+  }
   if (!settled.success) {
     const reason = `${settled.reason}${settled.message ? `: ${settled.message}` : ''}`;
     console.error(`[x402] settlement failed for job ${quote.jobId}: ${reason}`);
     const failed: PaymentRow = { ...payment, status: 'not_settled', reason };
     repo.updatePayment(payment.id, { status: 'not_settled', reason });
     events.emit({ type: 'payment.not_settled', payment: paymentView(failed, registry.nameOf) });
-    res.status(502).json({ error: 'SETTLEMENT_FAILED', charged: false, jobId: quote.jobId, providerId: quote.providerId, message: reason, result: run.result });
+    // No settlement → no result. The buyer was not charged and may resubmit.
+    res.status(502).json({ error: 'SETTLEMENT_FAILED', charged: false, jobId: quote.jobId, providerId: quote.providerId, reason: settled.reason });
     return;
   }
 

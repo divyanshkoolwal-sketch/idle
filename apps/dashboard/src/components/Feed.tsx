@@ -32,7 +32,10 @@ export function Feed({ state }: { state: MarketState }) {
     <section className="min-h-0 flex flex-col">
       <h2 className="text-[13px] text-ink-2 mb-2.5">Settlements and trust</h2>
       {items.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-rule-2 p-6 text-ink-2 text-[14px]">Every settlement, channel claim and credential change lands here with its explorer link.</div>
+        <div className="pt-6 px-1">
+          <div className="text-[14px] text-ink-3">Nothing settled yet.</div>
+          <div className="label mt-1 max-w-[36ch]">Settlements, channel claims and credential changes land here with their explorer links.</div>
+        </div>
       ) : (
         <ul className="overflow-hidden fade-bottom rounded-xl border border-rule bg-white px-3">
           {items.map((f) => (

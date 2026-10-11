@@ -41,3 +41,15 @@ export const ms = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 10_000 
 
 export const jobLabel = (jobType: JobType, units: number) =>
   jobType === 'embed' ? `embed · ${units} texts` : jobType === 'generate' ? `generate · ${units} tokens` : `stream · up to ${units} tokens`;
+
+const REASONS: Record<string, string> = {
+  above_max_unit_price: 'above max price',
+  above_max: 'above max price',
+  eta_exceeds_deadline: 'too slow for the deadline',
+  too_slow: 'too slow for the deadline',
+  no_capacity: 'no free slots',
+  not_verified: 'not verified',
+  below_tier: 'below the required tier',
+  no_free_slots: 'no free slots',
+};
+export const humanReason = (r?: string): string | undefined => (r ? (REASONS[r] ?? r.replace(/_/g, ' ')) : undefined);

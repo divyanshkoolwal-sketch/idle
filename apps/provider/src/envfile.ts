@@ -30,6 +30,6 @@ export function upsertEnv(file: string, key: string, value: string): boolean {
     out.push(`${key}=${value}`);
     changed = true;
   }
-  if (changed) writeFileSync(file, out.join('\n').replace(/\n*$/, '\n'));
+  if (changed) writeFileSync(file, out.join('\n').replace(/\n*$/, '\n'), { mode: 0o600 });
   return changed;
 }

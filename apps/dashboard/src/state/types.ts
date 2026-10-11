@@ -20,8 +20,11 @@ export interface StreamState {
   dropsPerToken: string;
   tokens: number;
   claimedDrops: string;
+  claims: number;
+  maxTokens?: number;
   settledTx?: string;
   openedAt: number;
+  lastTs: number;
 }
 
 export type SourceMode = 'live' | 'replay';
@@ -39,6 +42,7 @@ export interface MarketState {
   issuer: string;
   now: number; // replay-safe clock: last event ts
   wins: Record<string, number>; // providerId -> ts of last win (glow)
+  revokedAt: Record<string, number>; // providerId -> ts of revocation seen in this session
   eventCount: number;
   openAuctions: number;
 }
@@ -66,6 +70,7 @@ export const initialState: MarketState = {
   issuer: '',
   now: 0,
   wins: {},
+  revokedAt: {},
   eventCount: 0,
   openAuctions: 0,
 };

@@ -152,6 +152,7 @@ export function reduce(state: MarketState, ev: DashboardEvent): MarketState {
           ...state.providers,
           [p.id]: { ...p, status: 'suspended', strikes: ev.strikes, busySlots: 0, credential: { ...(p.credential ?? { type: '', status: '' }), deleteTx: ev.deleteTx ?? p.credential?.deleteTx, status: 'revoked' } },
         },
+        revokedAt: { ...state.revokedAt, [p.id]: state.revokedAt[p.id] ?? ev.ts },
       };
     }
     case 'auction.opened': {
@@ -252,27 +253,29 @@ export function reduce(state: MarketState, ev: DashboardEvent): MarketState {
       return {
         ...base,
         providers: p ? { ...state.providers, [p.id]: { ...p, status: 'suspended', strikes: ev.strikes, busySlots: 0, credential: { ...(p.credential ?? { type: '', status: '' }), deleteTx: ev.txHash, status: 'revoked' } } } : state.providers,
+        revokedAt: { ...state.revokedAt, [ev.providerId]: state.revokedAt[ev.providerId] ?? ev.ts },
         feed: pushFeed(state, { id: `cred.revoked:${ev.txHash}`, ts: ev.ts, tone: 'bad', kind: 'credential', title: `Credential revoked — ${ev.providerName}`, detail: `CredentialDelete after ${ev.strikes} strikes`, href: xrplTx(ev.txHash), linkLabel: 'XRPL' }),
       };
     }
     case 'paychan.opened': {
       const p = state.providers[ev.providerId];
+      const streamAuction = state.auctions.find((a) => a.jobType === 'stream' && a.winnerProviderId === ev.providerId && a.status === 'cleared');
       return {
         ...base,
-        streams: { ...state.streams, [ev.streamId]: { streamId: ev.streamId, providerId: ev.providerId, channelId: ev.channelId, buyer: ev.buyer, dropsPerToken: ev.dropsPerToken, tokens: 0, claimedDrops: '0', openedAt: ev.ts } },
+        streams: { ...state.streams, [ev.streamId]: { streamId: ev.streamId, providerId: ev.providerId, channelId: ev.channelId, buyer: ev.buyer, dropsPerToken: ev.dropsPerToken, tokens: 0, claimedDrops: '0', claims: 0, maxTokens: streamAuction?.units, openedAt: ev.ts, lastTs: ev.ts } },
         feed: pushFeed(state, { id: `chan:${ev.streamId}`, ts: ev.ts, tone: 'ink', kind: 'paychan', title: `Channel open → ${p?.name ?? ev.providerId}`, detail: `${Number(ev.dropsPerToken).toLocaleString()} drops per token, pay as you stream`, href: `https://testnet.xrpl.org/accounts/${ev.buyer}`, linkLabel: 'XRPL' }),
       };
     }
     case 'stream.token': {
       const s = state.streams[ev.streamId];
-      return s ? { ...base, streams: { ...state.streams, [s.streamId]: { ...s, tokens: Math.max(s.tokens, ev.index + 1) } } } : base;
+      return s ? { ...base, streams: { ...state.streams, [s.streamId]: { ...s, tokens: Math.max(s.tokens, ev.index + 1), lastTs: ev.ts } } } : base;
     }
     case 'paychan.claim': {
       const s = state.streams[ev.streamId];
       const p = state.providers[ev.providerId];
       return {
         ...base,
-        streams: s ? { ...state.streams, [s.streamId]: { ...s, tokens: Math.max(s.tokens, ev.tokens), claimedDrops: ev.drops } } : state.streams,
+        streams: s ? { ...state.streams, [s.streamId]: { ...s, tokens: Math.max(s.tokens, ev.tokens), claimedDrops: ev.drops, claims: s.claims + 1, lastTs: ev.ts } } : state.streams,
         feed: pushFeed(state, { id: `claim:${ev.streamId}`, ts: ev.ts, tone: 'ink', kind: 'paychan.claim', title: `Streaming — ${ev.tokens} tokens signed for`, detail: `${Number(ev.drops).toLocaleString()} drops authorised off-ledger to ${p?.name ?? ev.providerId}` }),
       };
     }
@@ -281,7 +284,7 @@ export function reduce(state: MarketState, ev: DashboardEvent): MarketState {
       const p = state.providers[ev.providerId];
       return {
         ...base,
-        streams: s ? { ...state.streams, [s.streamId]: { ...s, settledTx: ev.txHash, tokens: ev.tokens, claimedDrops: ev.drops } } : state.streams,
+        streams: s ? { ...state.streams, [s.streamId]: { ...s, settledTx: ev.txHash, tokens: ev.tokens, claimedDrops: ev.drops, lastTs: ev.ts } } : state.streams,
         providers: p ? { ...state.providers, [p.id]: { ...p, earnings: { ...p.earnings, drops: add(p.earnings.drops, ev.drops) } } } : state.providers,
         stats: { ...state.stats, dropsStreamed: add(state.stats.dropsStreamed, ev.drops) },
         feed: pushFeed(state, { id: `claimed:${ev.txHash}`, ts: ev.ts, tone: 'live', kind: 'paychan.claimed', title: `${xrp(ev.drops)} XRP → ${p?.name ?? ev.providerId}`, detail: `channel claim settled for exactly ${ev.tokens} delivered tokens`, href: xrplTx(ev.txHash), linkLabel: 'XRPL' }),
